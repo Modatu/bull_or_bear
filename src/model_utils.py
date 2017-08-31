@@ -1,9 +1,19 @@
 # utility functions and classes for model.py
 
+# imports
+import torch
+from torch.autograd import Variable
+import torch.nn as nn
+import torch.optim as optim
+
+
+#_______________code starts here_______________
+
 # simple LSTMnet class for many to one mapping
 class LSTMNet_simple_mto(torch.nn.Module):
-    def __init__(self, input_dim, hidden_dim, output_dim):
+    def __init__(self, input_dim, hidden_dim, output_dim, n_layers=1):
         super(LSTMNet_simple_mto, self).__init__()
+        self.n_layers = n_layers
         self.input_dim = input_dim
         self.hidden_dim = hidden_dim
         self.lstm = nn.LSTM(input_dim, hidden_dim)
@@ -13,14 +23,17 @@ class LSTMNet_simple_mto(torch.nn.Module):
         batch_size = x.size()[1]
         h0 = Variable(torch.cuda.FloatTensor(1, batch_size, self.hidden_dim).fill_(0), requires_grad=False)
         c0 = Variable(torch.cuda.FloatTensor(1, batch_size, self.hidden_dim).fill_(0), requires_grad=False)
-        fx, _ = self.lstm.forward(x, (h0, c0))
+        out = x
+        for i in range(self.n_layers):
+        	out, _ = self.lstm.forward(out, (h0, c0))
 
-        return self.linear.forward(fx[-1])
+        return self.linear.forward(out[-1])
 
  # simple LSTMnet class for many to many mapping
 class LSTMNet_simple_mtm(torch.nn.Module):
-    def __init__(self, input_dim, hidden_dim, output_dim):
+    def __init__(self, input_dim, hidden_dim, output_dim, n_layers=1):
         super(LSTMNet_simple_mtm, self).__init__()
+        self.n_layers = n_layers
         self.input_dim = input_dim
         self.hidden_dim = hidden_dim
         self.lstm = nn.LSTM(input_dim, hidden_dim)
@@ -30,9 +43,11 @@ class LSTMNet_simple_mtm(torch.nn.Module):
         batch_size = x.size()[1]
         h0 = Variable(torch.cuda.FloatTensor(1, batch_size, self.hidden_dim).fill_(0), requires_grad=False)
         c0 = Variable(torch.cuda.FloatTensor(1, batch_size, self.hidden_dim).fill_(0), requires_grad=False)
-        fx, _ = self.lstm.forward(x, (h0, c0))
+        out = x
+        for i in range(self.n_layers):
+        	out, _ = self.lstm.forward(out, (h0, c0))
 
-        return self.linear.forward(fx)
+        return self.linear.forward(out)
 
 # simple training function
 def train(model, loss, optimizer, x,y):
