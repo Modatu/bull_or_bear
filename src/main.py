@@ -62,31 +62,11 @@ y_test = y_np_test
 print 'shape x:', x_np.shape
 print 'shape y', y_np.shape
 
-train_size = len(y_np[0])
-input_dim = 1
-hidden_dim = 32
-batch_size = 1
+# actual training of model
+
 epochs = 20
 
-
-model = model_utils.LSTMNet_simple_mto(input_dim, hidden_dim, 1).cuda()
-loss = nn.MSELoss()
-optimizer = optim.Adam(model.parameters(), lr=0.001)
-
-for i in range(epochs):
-    cost = 0.
-    num_batches = train_size // batch_size
-    for k in range(num_batches):
-        start, end = k * batch_size, (k + 1) * batch_size
-
-        cost += model_utils.train(model, loss, optimizer, x[:, start:end, :], y[:, start:end, :])
-    predY = model_utils.predict(model, x_test)
-    predY = predY.flatten()
-    # print np.mean(np.sqrt(predY**2 - y_test**2))
-
-    print("Epoch %d, cost = %f, acc = %.3f%%" % 
-         (i + 1, cost / num_batches, 100 - np.mean(np.sqrt((predY - y_test)**2))))
-    # print("Epoch %d, cost = %f" % (i + 1, cost / num_batches))
+predY = model.fit_enc_dec(x, y, x_test, y_test, epochs)
 
 print np.column_stack((predY, y_test))
 
