@@ -34,7 +34,9 @@ def windower(data_x, data_y, windowsize):
   return array_x, array_y
 
 torch.manual_seed(42)
-# generate training data
+
+
+# generate training data, lame shit
 seq_length = 50
 x_np = np.linspace(0, 100*np.pi, 2000)
 y_np = np.sin(x_np)
@@ -62,11 +64,17 @@ y_test = y_np_test
 print 'shape x:', x_np.shape
 print 'shape y', y_np.shape
 
+# The interesting part begins
 # actual training of model
+epochs = 8
+model_type = 'lstm'
+model_type = 'seq2seq'
 
-epochs = 20
-
-predY = model.fit_enc_dec(x, y, x_test, y_test, epochs)
+print 'model type: ', model_type
+if model_type == 'seq2seq':
+  predY = model.fit_enc_dec(x, y, x_test, y_test, epochs)
+else:
+  predY = model.fit_lstm(x, y, x_test, y_test, epochs)
 
 print np.column_stack((predY, y_test))
 

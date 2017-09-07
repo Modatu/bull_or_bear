@@ -1,6 +1,6 @@
 # utility functions and classes for model.py
 
-# imports
+# imports global
 import torch
 from torch.autograd import Variable
 import torch.nn as nn
@@ -8,7 +8,7 @@ import torch.optim as optim
 import torch.nn.functional as F
 
 import time
-import math
+import numpy as np
 
 
 #_______________code starts here_______________
@@ -35,6 +35,7 @@ class LSTMNet_simple_mto(nn.Module):
 
         return self.linear.forward(out[-1])
 
+
  # simple LSTMnet class for many to many mapping
 class LSTMNet_simple_mtm(nn.Module):
     def __init__(self, input_dim, hidden_dim, output_dim, n_layers=1):
@@ -55,6 +56,7 @@ class LSTMNet_simple_mtm(nn.Module):
 
         return self.linear.forward(out)
 
+
 class EncoderRNN(nn.Module):
     def __init__(self, input_dim, hidden_dim, n_layers=1):
         super(EncoderRNN, self).__init__()
@@ -70,15 +72,16 @@ class EncoderRNN(nn.Module):
             output, hidden_states = self.lstm(output, hidden_states)
         return output, hidden_states
 
-    def initHidden(self):
-        h0 = Variable(torch.zeros(1, 1, self.hidden_dim))
-        c0 = Variable(torch.zeros(1, 1, self.hidden_dim))
+    def initHidden(self, batch_size):
+        h0 = Variable(torch.zeros(1, batch_size, self.hidden_dim))
+        c0 = Variable(torch.zeros(1, batch_size, self.hidden_dim))
         if use_cuda:
           h0 = h0.cuda()
           c0 = c0.cuda()
           return (h0, c0)
         else:
           return (h0, c0)
+
 
 class DecoderRNN(nn.Module):
     def __init__(self, hidden_dim, output_dim, n_layers=1):
@@ -98,12 +101,6 @@ class DecoderRNN(nn.Module):
         output = self.linear(output[0])
         return output, hidden_states
 
-    def initHidden(self):
-        result = Variable(torch.zeros(1, 1, self.hidden_size))
-        if use_cuda:
-            return result.cuda()
-        else:
-            return result
 
 # simple training function
 def train_lstm(model, loss, optimizer, x,y):
@@ -112,7 +109,7 @@ def train_lstm(model, loss, optimizer, x,y):
     optimizer.zero_grad()
 
     # Forward
-    fx = model.forward(x, hidden)
+    fx = model.forward(x)
     output = loss.forward(fx, y)
 
     # Backward
@@ -123,14 +120,16 @@ def train_lstm(model, loss, optimizer, x,y):
 
     return output.data[0]
 
+
 def train_encoder_decoder(encoder, decoder, loss, optimizer_encoder, optimizer_decoder, x,y):
 
+    batch_size = x.size()[1]
     # Reset gradient
     optimizer_encoder.zero_grad()
     # optimizer_decoder.zero_grad()
 
     # forward pass through encoder
-    encoder_hidden = encoder.initHidden()
+    encoder_hidden = encoder.initHidden(batch_size)
     encoder_outputs, encoder_hidden = encoder.forward(x, encoder_hidden)
 
     # set decoder hidden states equal to the encoder output hidden state
@@ -153,15 +152,30 @@ def train_encoder_decoder(encoder, decoder, loss, optimizer_encoder, optimizer_d
 
 
 # simple predict function
-def predict(model, x_test):
+def predict_lstm(model, x_test):
     # x = Variable(x_val, requires_grad=False)
     output = model.forward(x_test)
     return output.data.cpu().numpy()
 
+
+def predict_enc_dec(encoder, decoder, x_test):
+    # x = Variable(x_val, requires_grad=False)
+    batch_size = x_test.size()[1]
+    encoder_hidden = encoder.initHidden(batch_size)
+    encoder_outputs, encoder_hidden = encoder.forward(x_test, encoder_hidden)
+
+    decoder_hidden = encoder_hidden
+
+    output, _ = decoder.forward(encoder_outputs, decoder_hidden)
+
+    return output.data.cpu().numpy()
+
+
 def as_minutes(s):
-    m = math.floor(s / 60)
+    m = np.floor(s / 60)
     s -= m * 60
     return '%dm %ds' % (m, s)
+
 
 def time_since(since, percent):
     now = time.time()

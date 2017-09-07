@@ -17,7 +17,7 @@ output_dim = 1
 batch_size = 1
 
 
-def fit(x, y, x_test, y_test, epochs):
+def fit_lstm(x, y, x_test, y_test, epochs):
 
     print_every = 2
     model = model_utils.LSTMNet_simple_mto(input_dim, hidden_dim, 1).cuda()
@@ -27,22 +27,16 @@ def fit(x, y, x_test, y_test, epochs):
     train_size = len(y[0])
     cost = 0.
 
-    # has_init_hidden = getattr(model, 'initHidden', None)
-    # if has_init_hidden:
-    #     print('initialise hidden states')
-    #     model.initHidden()
-    
-
     for epoch in range(epochs):
         
         num_batches = train_size // batch_size
         for k in range(num_batches):
             start, end = k * batch_size, (k + 1) * batch_size
     
-            cost += model_utils.train(model, loss, optimizer, x[:, start:end, :], y[:, start:end, :])
-        predY = model_utils.predict(model, x_test)
+            cost += model_utils.train_lstm(model, loss, optimizer, x[:, start:end, :], y[:, start:end, :])
+        predY = model_utils.predict_lstm(model, x_test)
         predY = predY.flatten()
-        # print np.mean(np.sqrt(predY**2 - y_test**2))
+
         if epoch == 0: continue
 
         if epoch % print_every == 0:
@@ -63,13 +57,9 @@ def fit_enc_dec(x, y, x_test, y_test, epochs):
     optimizer_decoder = optim.Adam(model_decoder.parameters(), lr=0.001)
     start_time = time.time()
     train_size = len(y[0])
-    cost = 0.
 
-    # has_init_hidden = getattr(model, 'initHidden', None)
-    # if has_init_hidden:
-    #     print('initialise hidden states')
-    #     model.initHidden()
-    
+    print 'train_size', train_size
+    cost = 0.
 
     for epoch in range(epochs):
         
@@ -80,10 +70,11 @@ def fit_enc_dec(x, y, x_test, y_test, epochs):
             cost += model_utils.train_encoder_decoder(model_encoder, model_decoder, loss,
                                                       optimizer_encoder, optimizer_decoder,
                                                       x[:, start:end, :], y[:, start:end, :])
-        # predY = model_utils.predict(model, x_test)
-        # predY = predY.flatten()
-        # print np.mean(np.sqrt(predY**2 - y_test**2))
-        predY = 0
+        
+        predY = model_utils.predict_enc_dec(model_encoder, model_decoder, x_test)
+        predY = predY.flatten()
+
+
         if epoch == 0: continue
 
         if epoch % print_every == 0:
