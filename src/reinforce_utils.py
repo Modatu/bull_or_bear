@@ -90,7 +90,7 @@ class Memory(object):
     self.position = 0
 
 class Env():  
-  def __init__(self, X, Y, X_ref, Y_ref, credit, stock, ind):
+  def __init__(self, X, Y, X_ref, Y_ref, credit, stock, value, ind):
       self.x = X
       self.y = Y
       self.x_ref = X_ref
@@ -98,8 +98,9 @@ class Env():
       self.credit = credit
       self.start_credit = credit
       self.start_stock = stock
+      self.start_value = value
       self.stock = stock
-      self.value = credit # Not correct, but for the time being its fine...
+      self.value = value # Not correct, but for the time being its fine...
       self.ind = ind
       self.ind_start = ind
       self.state_shape = X.shape
@@ -114,7 +115,7 @@ class Env():
     self.exp_terminal1 = None
     self.exp_credit = self.start_credit
     self.exp_stock = self.start_stock
-    self.exp_value = self.start_credit # Not correct, but for the time being its fine...
+    self.exp_value = self.start_value
 
 
   def _get_experience(self):
@@ -133,7 +134,7 @@ class Env():
     self.exp_state1 = self.x[:, self.ind + 1, :]
     return self._get_experience()
 
-  def eval_action(self, action, credit_diff, credit_max, value_max, value_min, credit_now, value_now):
+  def eval_action(self, action, credit_diff, credit_max, value_max, value_min, credit_now, value_now, stock, price_now):
     # diff =  self.y_ref[0, ind, 4] - self.x_ref[-1, ind, 4]
     # diff = self.x_ref[-1, ind, 4] - np.mean(self.y_ref[0:10, ind, 4])
 
@@ -143,33 +144,38 @@ class Env():
     #   r = -1
     # else:
     #   r = 0
+    # if action == 0 and credit_now <= price_now:
+    #   r = -10
+    # elif action == 2 and stock == 0:
+    #   r = -10
+    # else:
+    #   r = 0
 
     # Reward only if max credit is over hist. high
-    # credit_max = credit_max * 1.01
-    # if credit_now > credit_max:
-    #   print('credit', credit_now)
-    #   print('*****************************************')
-    #   print('-------------------------------------------------------juhu>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>')
-    #   print('*****************************************')
-    #   r = 1000
-    # else:
-    #   r = -1
+    credit_max = credit_max * 1.001
+    if credit_now > credit_max:
+      print('credit', credit_now)
+      print('*****************************************')
+      print('-------------------------------------------------------juhu credit>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>')
+      print('*****************************************')
+      r = 1000
+    else:
+      r = -1
 
     # Reward only if max value is over hist. high
-    credit_max = credit_max * 1.01
-    if value_now > value_max:
+    if value_now > value_max and value_now > credit_now:
       print('value now', value_now)
       print('*****************************************')
-      print('-------------------------------------------------------juhu>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>')
+      print('-------------------------------------------------------juhu value>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>')
       print('*****************************************')
-      r = value_now - value_max
+      r += 50
     elif value_now < value_min:
       # print('value now', value_now)
       # print('*****************************************')
       # print('-------------------------------------------------------buuu>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>')
-      r = value_now - value_min
+      r += -1
     else:
-      r = 0
+      r += 0
 
 #     if diff < 0. and action < 1:
 #       r = -diff - 0.01 * self.x_ref[-1, ind, 4]
@@ -230,9 +236,9 @@ class Env():
         value_min = np.amin(value_hist)
 
     
-    self.exp_value =  (self.exp_stock * self.x_ref[-1, self.ind, 4] ) + self.exp_credit
+    self.exp_value =  (self.exp_stock * self.x_ref[-1, self.ind, 4] )# + self.exp_credit
 
-    self.exp_reward = self.eval_action(self.exp_action, credit_diff, credit_max, value_max, value_min, self.exp_credit, self.exp_value)
+    self.exp_reward = self.eval_action(self.exp_action, credit_diff, credit_max, value_max, value_min, self.exp_credit, self.exp_value, self.exp_stock ,self.x_ref[-1, self.ind, 4])
     self.exp_state0, self.exp_state1 = self.return_state()
 
     self.ind += 1
@@ -251,6 +257,9 @@ class DDQNAgent(object):
     self.memory = memory_in
     self.optimiser = optim.Adam(self.model.parameters(), lr=self.options.lr) #, weight_decay=self.options.weight_decay)
     self.gamma = self.options.gamma
+    self.eps_decay = self.options.eps_decay #0.0001
+    self.eps_start = self.options.eps_start #1
+    self.eps_end = self.options.eps_end #0.05
     self.loss = nn.SmoothL1Loss()
     self.target_model_update = 4
 
@@ -314,8 +323,8 @@ class DDQNAgent(object):
       self.eps = self.eps_start - ((self.eps_start - self.eps_end) * self.eps_decay * self.step )
       if self.eps <= self.eps_end:
         self.eps = self.eps_end
-      # if self.step % 1000 == 0:
-      #   print('eps', self.eps)
+      if self.step % 1000 == 0:
+        print('eps', self.eps)
     else:
       self.eps = self.eps_eval
     # choose action
@@ -386,9 +395,6 @@ class DDQNAgent(object):
     self.step = 0
     self.memory_interval = 1 # how often samples are stored in memory
     self.learn_start = (self.options.batch_size * self.memory_interval) + 5 #self.step + 10 # before this random action
-    self.eps_decay = 0.001
-    self.eps_start = 1
-    self.eps_end = 0.05
     self.training = True
     self.use_cuda = True
     
@@ -412,32 +418,25 @@ class DDQNAgent(object):
     counter2 = 0
 
     while self.step < self.options.steps:
-      if self.step%100 == 0 and self.step != 0:
+      if self.step%1000 == 0 and self.step != 0:
         print('<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<')
         print('step: ', self.step)
         print('episode reward:', episode_reward)
         print('stock now:', self.experience.stock)
-        # print('max stock:', np.amax(stock_hist))
-        # print('min stock:', np.amin(stock_hist))
+        print('max stock:', np.amax(stock_hist))
+        print('min stock:', np.amin(stock_hist))
         print('credit now:', self.experience.credit)
         print('value now:', self.experience.value)
-        # print('mean credit:', np.mean(credit_hist))
+        print('mean credit:', np.mean(credit_hist))
         print('max credit:', np.amax(credit_hist))
-        if self.step > 1000:
-          print('max value:', np.amax(value_hist[(self.step-1000):self.step]))
-          print('min value:', np.amin(value_hist[(self.step-1000):self.step]))
-        else:
-          print('max value:', np.amax(value_hist[0:self.step]))
-          print('min value:', np.amin(value_hist[0:self.step]))
+        # if self.step > 1000:
+        #   print('max value:', np.amax(value_hist[(self.step-1000):self.step]))
+        #   print('min value:', np.amin(value_hist[(self.step-1000):self.step]))
+        # else:
+        print('max value:', np.amax(value_hist[0:self.step]))
+        print('min value:', np.amin(value_hist[0:self.step]))
         print('action count:', np.bincount(action_hist.astype(int))[0:3])
         print('---------------------------------------')
-        # logger.info(str(self.step)+','+
-        #             str(self.experience.stock)+','+
-        #             str(self.experience.credit)+','+
-        #             str(np.amax(credit_hist))+','+
-        #             str(np.bincount(action_hist.astype(int))[0])+','+
-        #             str(np.bincount(action_hist.astype(int))[1])+','+
-        #             str(np.bincount(action_hist.astype(int))[2]))
         logger.info('{0:12d},{1:12d},{2:12.2f},{3:12.2f},{4:12d},{5:12d},{6:12d}'.format(self.step, self.experience.stock, self.experience.credit, np.amax(credit_hist), np.bincount(action_hist.astype(int))[0], np.bincount(action_hist.astype(int))[1], np.bincount(action_hist.astype(int))[2]) )
        
         stock_hist[:] = 0

@@ -36,24 +36,29 @@ print(x_np_ref.shape)
 print(x_np.shape)
 print(y_np.shape)
 
-Options = namedtuple('Options', 'credit, capacity, stock, ind, input_dim, hidden_dim, output_dim, window_size, batch_size, nlayer, lr, steps, gamma')
-Options_really_now = Options(credit = 10000,
-        capacity = 6000,
-        stock = 0,
+Options = namedtuple('Options', 'value, credit, capacity, stock, ind, input_dim, hidden_dim, output_dim, window_size, batch_size, nlayer, lr, steps, gamma, eps_decay, eps_start, eps_end')
+Options_really_now = Options(
+        value = 5000,
+        credit = 5000,
+        capacity = 1000,
+        stock = 5,
         ind = 0,
         input_dim = 6,
-        hidden_dim = 64,
+        hidden_dim = 32,
         output_dim = 3,
         window_size = 90,
-        nlayer = 2,
-        batch_size = 8,
+        nlayer = 4,
+        batch_size = 2,
         lr = 0.0028,
         steps = 10000000,
-        gamma = 0.8)
+        gamma = 0.6,
+        eps_decay = 0.001,
+        eps_start = 1,
+        eps_end = 0.05)
 
 print(Options_really_now.credit)
 print('len', len(x_np[1]))
-env = reinforce_utils.Env(x_np, y_np, x_np_ref, y_np_ref, Options_really_now.credit, Options_really_now.stock, Options_really_now.ind)
+env = reinforce_utils.Env(x_np, y_np, x_np_ref, y_np_ref, Options_really_now.credit, Options_really_now.stock, Options_really_now.value, Options_really_now.ind)
 # model = model_utils.LSTM_DQN(Options_really_now.input_dim, Options_really_now.hidden_dim, Options_really_now.output_dim).cuda()
 # target_model = model_utils.LSTM_DQN(Options_really_now.input_dim, Options_really_now.hidden_dim, Options_really_now.output_dim).cuda()
 model = model_utils.LSTM_DDDQN(Options_really_now.input_dim, Options_really_now.hidden_dim, Options_really_now.output_dim).cuda()
